@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FarmWise Naija - Integrated Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9050962990938030"
+     crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+        }
+        #weather-map-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+            max-width: 100%;
+        }
+        #weather-map-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .text-up { color: #2ecc71; }
+        .text-down { color: #e74c3c; }
+
+        /* --- STYLES FOR INTEGRATED COMPONENTS --- */
+        .tab-button {
+            transition: all 0.2s ease-in-out;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-button.active {
+            border-bottom-color: #4ade80; /* Green-400 */
+            color: #4ade80; /* Green-400 */
+            font-weight: 600;
+        }
+        .modal-backdrop {
+            display: none; position: fixed; inset: 0;
+            background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 40;
+        }
+        .modal-content {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); z-index: 50; max-height: 90vh;
+        }
+
+        /* AI Chat Specific Styles */
+        #ai-chat-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; width: 90%; max-width: 400px; height: 80%; max-height: 600px; display: none; flex-direction: column; }
+        #chat-header { background-color: #1f2937; border-bottom: 1px solid #374151; }
+        #chat-body { background-color: #1f2937; flex-grow: 1; overflow-y: auto; border-top: 1px solid #374151; padding: 1rem; }
+        .message { margin-bottom: 0.75rem; display: flex; }
+        .user-message { justify-content: flex-end; }
+        .user-message p { background-color: #2563eb; color: white; padding: 0.5rem 1rem; border-radius: 1rem 1rem 0 1rem; max-width: 80%; }
+        .ai-message { justify-content: flex-start; }
+        .ai-message p { background-color: #4b5563; color: #d1d5db; padding: 0.5rem 1rem; border-radius: 1rem 1rem 1rem 0; max-width: 80%; }
+        #chat-input-container { background-color: #1f2937; border-top: 1px solid #374151; }
+        .typing-indicator span { animation: bounce 0.8s infinite; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300">
+    
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-4">
+            <h1 class="text-4xl font-bold text-green-400">FarmWise Dashboard &#127475;&#127468;</h1>
+            <h1 class="text-green-500 text-sm">West Africa (beta) version</h1>
+            <p class="text-lg text-green-400 mt-2">From Nigeria to Global Markets</p>
+            <marquee><p class="text-sm text-green-500 mt-1" id="current-date"></p></marquee>
+        </header>
+
+        <div class="mb-6 border-b border-gray-700">
+            <nav class="flex flex-wrap -mb-px justify-center" id="tabs-container">
+                <button class="tab-button active py-4 px-6" data-tab="crops-tab"><i class="fas fa-seedling mr-2"></i>Crops Dashboard</button>
+                <button class="tab-button py-4 px-6" data-tab="market-tab"><i class="fas fa-chart-line mr-2"></i>Poultry Market</button>
+                <button class="tab-button py-4 px-6" data-tab="farming-tab"><i class="fas fa-drumstick-bite mr-2"></i>Flock Management</button>
+            </nav>
+            <div class="flex justify-center mt-4">
+                 <div class="relative">
+                    <label for="location-select" class="text-sm font-medium text-gray-400 mr-2">My Market:</label>
+                    <select id="location-select" class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 p-2">
+                        <option value="lagos">Lagos</option>
+                        <option value="ibadan">Ibadan</option>
+                        <option value="ogun">Ogun</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-content">
+            <div id="crops-tab">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 space-y-8">
+                        <section id="rainy-season" class="bg-gray-800 p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4">Seasonal Forecast (Southwest Nigeria)</h2>
+                            <div id="forecast-content" class="text-lg"></div>
+                            <p class="text-sm text-gray-400 mt-4">General Pattern: The primary rainy season typically runs from March to November, with a drier "August Break".</p>
+                        </section>
+                        <section id="market-charts" class="bg-gray-800 p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4">Market Price Trends 📈</h2>
+                            <p class="text-sm text-gray-400 mb-4">Visualize the average local market prices for key produce.</p>
+                            <canvas id="localPricesChart"></canvas>
+                        </section>
+                        <section id="shipping-charts" class="bg-gray-800 p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4">International Shipping Costs 📊</h2>
+                            <p class="text-sm text-gray-400 mb-4">An interactive bar chart showing estimated shipping costs to major international ports.</p>
+                            <canvas id="shippingCostsChart"></canvas>
+                        </section>
+                        <section id="crop-info">
+                            <h2 class="text-2xl font-semibold text-gray-200 text-center mb-6">Crop Cultivation Guide</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="crop-cards-container"></div>
+                        </section>
+                        <section id="value-added-prices" class="bg-gray-800 p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4">
+                                <i class="fas fa-industry mr-2 text-orange-400"></i>Value-Added Product Prices
+                                <span class="text-sm text-orange-500 block md:hidden">*kindly scroll to the right for full price details</span>
+                            </h2>
+                            <div class="overflow-x-auto"><table class="w-full text-left"><thead class="bg-orange-600 text-white"><tr><th class="p-3">Product</th><th class="p-3">Source Crop</th><th class="p-3">Price</th><th class="p-3">Unit</th></tr></thead><tbody id="value-added-table-body"></tbody></table></div>
+                        </section>
+                        <section id="shipping-prices" class="bg-gray-800 p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4">
+                                <i class="fas fa-ship mr-2 text-blue-400"></i>International Shipping Estimates
+                                <span class="text-sm text-blue-500 block md:hidden">*kindly scroll to the right for full cost details</span>
+                            </h2>
+                            <p class="text-gray-400 mb-4">Estimated costs for shipping a 20ft container from Lagos (Apapa Port), Nigeria.</p>
+                            <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="bg-blue-600 text-white"><th class="p-3">Destination Port</th><th class="p-3">Region</th><th class="p-3">Estimated Cost (USD)</th><th class="p-3">Transit Time</th></tr></thead><tbody id="shipping-table-body"></tbody></table></div>
+                           <p class="text-xs text-gray-500 mt-3">*Prices are estimates and subject to change based on carrier, season, and fuel surcharges.</p>
+                        </section>
+                    </div>
+                    <div class="lg:col-span-1 space-y-8">
+                        <section id="market-prices">
+                            <h2 class="text-2xl font-semibold text-gray-200 mb-4 text-center">Market Price Watch</h2>
+                            <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6"><h3 class="font-bold text-lg mb-3 text-center text-green-400">Local Farm Produce Prices</h3><table class="w-full text-left"><thead><tr class="bg-green-600 text-white"><th class="p-3">Produce</th><th class="p-3">Price/100kg</th><th class="p-3">Trend</th></tr></thead><tbody id="prices-table-body"></tbody></table></div>
+                            <div class="bg-gray-800 p-6 rounded-lg shadow-md"><h3 class="font-bold text-lg mb-3 text-center text-indigo-400">Global Commodity Market</h3><table class="w-full text-left"><thead><tr class="bg-indigo-600 text-white"><th class="p-3">Commodity</th><th class="p-3">Price (USD)</th><th class="p-3">Unit</th></tr></thead><tbody id="global-prices-table-body"></tbody></table><p class="text-xs text-gray-500 mt-3">*Global prices influence local export prices.</p></div>
+                        </section>
+                        <section id="organizations" class="bg-gray-800 p-6 rounded-lg shadow-md"><h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4"><i class="fas fa-sitemap mr-2 text-green-400"></i>Key Export Organizations</h2><div id="orgs-container" class="space-y-4"></div></section>
+                        <section id="weather-map" class="bg-gray-800 p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4">Live Weather Map</h2><span class="text-sm text-green-500">*Search for Lagos, Ibadan, Abeokuta, or Akure to view current weather conditions...</span>
+                            <div class="mb-4"><div class="flex flex-col sm:flex-row gap-2"><input type="text" id="location-search" placeholder="Enter a city (e.g., Lagos)" class="flex-grow p-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"><button id="search-btn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">Search</button></div></div>
+                            <div id="weather-map-container" class="rounded-lg overflow-hidden border border-gray-700"><iframe id="windy-map" src="https://embed.windy.com/embed2.html?lat=6.5244&lon=3.3792&detailLat=6.5244&detailLon=3.3792&width=650&height=450&zoom=7&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1"></iframe></div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="market-tab" class="hidden space-y-8">
+                 <section class="bg-gray-800 p-6 rounded-lg shadow-md">
+                     <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-green-700 pb-2 mb-4">Local Poultry Market Prices (<span class="location-name">Lagos</span>)</h2>
+                     <div class="h-96"><canvas id="local-price-chart"></canvas></div>
+                </section>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <section class="bg-gray-800 p-6 rounded-lg shadow-md">
+                         <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-yellow-500 pb-2 mb-4">Related Product Prices</h2>
+                         <div class="overflow-x-auto">
+                             <table class="w-full text-left text-gray-200">
+                                 <thead class="bg-yellow-600 text-white">
+                                     <tr><th class="p-3">Product</th><th class="p-3">Price (NGN)</th></tr>
+                                 </thead>
+                                 <tbody id="related-products-body"></tbody>
+                             </table>
+                         </div>
+                    </section>
+                    <section class="bg-gray-800 p-6 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-semibold text-gray-200 border-b-2 border-indigo-500 pb-2 mb-4">Global Feed Market</h2>
+                        <div class="h-64"><canvas id="global-feed-chart"></canvas></div>
+                    </section>
+                </div>
+            </div>
+
+            <div id="farming-tab" class="hidden space-y-8">
+                <section>
+                    <h2 class="text-3xl font-bold text-gray-200 text-center mb-6">Poultry Management Guide</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8" id="poultry-cards-container"></div>
+                </section>
+                <section class="bg-gray-800 p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold text-gray-200 border-b-2 border-red-700 pb-2 mb-4"><i class="fas fa-viruses mr-2 text-red-500"></i>Common Disease Guide</h2>
+                    <p class="text-gray-400 mb-6">Click an image to learn about symptoms and prevention.</p>
+                    <div id="disease-guide-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+                </section>
+            </div>
+        </div>
+
+        <footer class="text-center mt-10 pt-6 border-t border-gray-700">
+            <p class="text-gray-500">&copy; 2025 Farm Wise Dashboard. By Stanley Bagambisa; Junior Web Developer, Ogun State, Nigeria.</p>
+        </footer>
+    </div>
+    
+    <div id="disease-modal-backdrop" class="modal-backdrop"></div>
+    <div id="disease-modal-content" class="modal-content bg-gray-800 rounded-lg shadow-xl w-11/12 md:w-2/3 lg:w-1/2 overflow-y-auto border border-gray-700">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-700">
+                <h3 id="modal-title" class="text-2xl font-bold text-gray-200"></h3>
+                <button id="modal-close-btn" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            <div id="modal-body" class="space-y-4">
+                <img id="modal-image" src="" alt="Disease" class="w-full h-64 object-cover rounded-lg mb-4">
+                <div><h4 class="font-bold text-lg text-gray-200">Symptoms:</h4><p id="modal-symptoms" class="text-gray-400"></p></div>
+                <div><h4 class="font-bold text-lg text-gray-200">Prevention & Management:</h4><p id="modal-management" class="text-gray-400"></p></div>
+            </div>
+        </div>
+    </div>
+    
+    <button id="ai-chat-btn" class="fixed bottom-6 right-6 p-4 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 z-50"><i class="fas fa-robot text-2xl"></i></button>
+    <div id="ai-chat-container" class="bg-gray-800 rounded-lg shadow-2xl overflow-hidden">
+        <div id="chat-header" class="flex justify-between items-center p-4"><h3 class="text-lg font-semibold text-gray-200">FarmWise AI Assistant</h3><button id="chat-close-btn" class="text-gray-400 hover:text-white">&times;</button></div>
+        <div id="chat-body" class="p-4 flex-grow overflow-y-auto space-y-4"><div class="ai-message"><p>Hello! I'm your FarmWise AI Assistant. How can I help you today?</p></div></div>
+        <div id="chat-input-container" class="p-4 flex items-center gap-2"><input type="text" id="chat-input" placeholder="Ask a question..." class="flex-grow p-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"><button id="chat-send-btn" class="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"><i class="fas fa-paper-plane"></i></button></div>
+    </div>
+
+    <script>
+        tailwind.config = { theme: { extend: { backgroundImage: { 'hero-pattern': "url('/images/NigerianFabric.png')", } } } }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- DATA OBJECTS (Original FarmWise) ---
+            const cropData = { "Cassava": { planting: "Plant cuttings at the start of the rainy season (April-May). Ensures good root establishment before dry spells.", irrigation: "Drought-tolerant once established, but requires water in the first 3 months. Supplemental irrigation during August break boosts yield.", icon: "🌱" }, "Oil Palm": { planting: "Transplant seedlings during the wet season (May-June) for best results. Requires deep, well-drained soil.", irrigation: "Young palms need consistent moisture. Mature palms are rain-fed but irrigation in dry season increases fruit bunch yield significantly.", icon: "🌴" }, "Groundnuts": { planting: "Plant between late March and May. Avoid waterlogged soil. Early planting allows for two cycles in a year.", irrigation: "Crucial during flowering and pegging stages. Inconsistent water can lead to empty pods (pops).", icon: "🥜" }, "Beans (Cowpea)": { planting: "Can be planted early (Mar-Apr) and late (Aug-Sept). It is a hardy crop adaptable to various planting times.", irrigation: "Generally rain-fed. However, watering during flowering can prevent flower drop and increase pod formation.", icon: "🫘" }, "Kola Nut": { planting: "Grown from seeds or cuttings, best planted during the rainy season. It's a tree crop that requires patience.", irrigation: "Young trees need regular watering. Mature trees are mostly rain-fed but benefit from irrigation in harsh dry seasons.", icon: "🌰" }, "Tiger Nut": { planting: "Plant tubers from April to June. Thrives in sandy loam soil with good sun exposure.", irrigation: "Requires consistent and abundant water, especially during tuber formation. Drip or furrow irrigation is ideal.", icon: "🌾" } };
+            const marketPrices = [ { name: "Cassava", price_per_100kg: "₦45,000 - ₦55,000", trend: "Up", avg_price: 50000 }, { name: "Palm Fruit", price_per_100kg: "₦60,000 - ₦70,000", trend: "Stable", avg_price: 65000 }, { name: "Groundnuts", price_per_100kg: "₦140,000 - ₦160,000", trend: "Up", avg_price: 150000 }, { name: "Beans (Oloyin)", price_per_100kg: "₦150,000 - ₦170,000", trend: "Stable", avg_price: 160000 }, { name: "Kola Nuts", price_per_100kg: "Varies widely", trend: "Stable", avg_price: 0 }, { name: "Tiger Nuts (Dry)", price_per_100kg: "₦200,000 - ₦230,000", trend: "Up", avg_price: 215000 } ];
+            const valueAddedPrices = [ { product: "Garri (Ijebu)", source: "Cassava", price: "₦35,000 - ₦40,000", unit: "50kg Bag" }, { product: "Fufu Flour", source: "Cassava", price: "₦1,500 - ₦1,800", unit: "1kg" }, { product: "Palm Oil", source: "Palm Fruit", price: "₦28,000 - ₦32,000", unit: "25 Litres" }, { product: "Palm Kernel Oil", source: "Palm Fruit", price: "₦25,000 - ₦28,000", unit: "25 Litres" }, { product: "Groundnut Oil", source: "Groundnuts", price: "₦40,000 - ₦45,000", unit: "25 Litres" }, { product: "Kuli-Kuli", source: "Groundnuts", price: "₦1,000 - ₦1,500", unit: "Paint Bucket" }, { product: "Bean Flour", source: "Beans", price: "₦2,000 - ₦2,500", unit: "1kg" } ];
+            const globalMarketPrices = [ { commodity: "Crude Palm Oil", price: "950.00", unit: "per MT (Metric Ton)" }, { commodity: "Cocoa", price: "9,850", unit: "per MT (ICE London)" }, { commodity: "Groundnuts (Peanuts)", price: "1,900", unit: "per MT (US Runner)" }, { commodity: "Corn (Maize)", price: "4.50", unit: "per Bushel (CME)" } ];
+            const exportOrgs = [ { name: "Nigerian Export Promotion Council (NEPC)", description: "The primary federal agency responsible for promoting the development and diversification of Nigeria's export trade." }, { name: "Federation of West African Chambers of Commerce and Industry (FEWACCI)", description: "A regional body that promotes trade, economic cooperation, and regional integration among West African states." }, { name: "Cocoa Association of Nigeria (CAN)", description: "Advocates for cocoa farmers and exporters, focusing on quality control, market access, and sustainable practices." }, { name: "Oil Palm Growers Association of Nigeria (OPGAN)", description: "Represents the interests of oil palm farmers, supporting them with inputs, training, and market linkages." } ];
+            const shippingData = [ { port: "Antwerp, Belgium", region: "Europe", cost: "3800-4500", time: "20-30 Days", avg_cost: 4150 }, { port: "Rotterdam, Netherlands", region: "Europe", cost: "3800-4600", time: "20-30 Days", avg_cost: 4200 }, { port: "Houston, USA", region: "North America", cost: "5500-6500", time: "30-40 Days", avg_cost: 6000 }, { port: "Guangzhou, China", region: "Asia", cost: "4200-5000", time: "40-50 Days", avg_cost: 4600 }, { port: "Jebel Ali, UAE", region: "Middle East", cost: "3500-4200", time: "25-35 Days", avg_cost: 3850 } ];
+            
+            // --- DATA OBJECTS (Integrated Components) ---
+            const marketState = { location: 'lagos' };
+            const flockManagementData = { poultryInfo: { "Broilers": { icon: "🐔", housing: "Provide 1-1.5 sq. ft. per bird. Ensure dry litter (wood shavings) and good ventilation.", feeding: "Use high-protein starter feed (0-4 weeks), grower (4-6 weeks), and finisher (6 weeks to market).", health: "Vaccinate against Newcastle and Gumboro. Monitor for coccidiosis. Maintain strict biosecurity." }, "Layers": { icon: "🥚", housing: "Provide 1.5-2 sq. ft. per bird. Ensure adequate lighting (16 hours/day) for optimal egg production.", feeding: "Use chick starter, grower mash, and then layer mash once they start laying (around 18-20 weeks).", health: "Key vaccinations include Newcastle, Gumboro, and Fowl Pox. Deworm regularly." } }, diseaseGuide: [ { id: 'newcastle', name: 'Newcastle', img: 'https://d1lg8auwtggj9x.cloudfront.net/images/newcastledisease.width-820.jpg', symptoms: 'Twisted neck, coughing, gasping, greenish watery diarrhea, paralysis.', management: 'Strict vaccination schedule (day 7, week 4, then every 3 months). No cure, prevention is key.' }, { id: 'gumboro', name: 'Gumboro (IBD)', img: 'https://avinews.com/wp-content/uploads/2024/07/Gumboro-disease.png', symptoms: 'Whitish watery diarrhea, ruffled feathers, depression, high mortality in young chicks (3-6 weeks).', management: 'Vaccination of chicks is critical. Good sanitation and hygiene between batches.' }, { id: 'coccidiosis', name: 'Coccidiosis', img: 'https://www.kalmbachfeeds.com/cdn/shop/articles/Ayan_chicken.jpg?v=1755204939', symptoms: 'Bloody droppings, huddling together, loss of appetite, pale combs.', management: 'Use medicated feed (coccidiostats). Keep litter clean and dry. Treat outbreaks with Amprolium.' }, { id: 'fowlpox', name: 'Fowl Pox', img: 'https://bukoolavet.com/wp-content/uploads/2022/06/avian-pox-in-chickens-1024x705-1.jpg', symptoms: 'Pox-like lesions on combs, wattles (dry form) or in the mouth and throat (wet form).', management: 'Vaccination is effective. Control mosquito populations as they spread the virus.' } ] };
+            const poultryMarketData = { priceData: { labels: ["Apr", "May", "Jun", "Jul", "Aug"], locations: { lagos: { name: "Lagos", broiler: [7500, 7800, 8000, 8200, 8100], eggs: [4800, 4700, 4900, 5000, 5200] }, ibadan: { name: "Ibadan", broiler: [7200, 7500, 7800, 8000, 7900], eggs: [4600, 4500, 4700, 4800, 5000] }, ogun: { name: "Ogun", broiler: [7300, 7600, 7900, 8100, 8000], eggs: [4700, 4600, 4800, 4900, 5100] } } }, relatedProducts: [ { product: "Day-Old Chicks (Broiler)", price: "₦1,000 - ₦1,300 each" }, { product: "Frozen Chicken", price: "₦7,000 - ₦8,000 per kg" }, { product: "Poultry Manure", price: "₦2,000 - ₦3,000 per bag" } ], globalFeed: { labels: ["Apr", "May", "Jun", "Jul", "Aug"], soybean: { name: "Soybean Meal ($/ton)", data: [450, 465, 460, 470, 480] }, maize: { name: "Maize (Corn) ($/bushel)", data: [6.5, 6.2, 6.0, 5.8, 5.9] } } };
+
+            // --- DATE & FORECAST (Original) ---
+            const dateElement = document.getElementById('current-date');
+            const forecastElement = document.getElementById('forecast-content');
+            const now = new Date();
+            const month = now.getMonth();
+            dateElement.textContent = `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+            let forecastMessage = "";
+            if (month >= 2 && month <= 6) { forecastMessage = "Primary rainy season. Crucial time for planting and crop establishment."; } else if (month === 7) { forecastMessage = "'August Break'. Rainfall may be lighter."; } else if (month >= 8 && month <= 10) { forecastMessage = "Latter rainy season. Good for late-season planting."; } else { forecastMessage = "Dry season. Irrigation is essential. Focus on harvesting and land prep."; }
+            forecastElement.innerHTML = `<p class="bg-blue-900 border-l-4 border-blue-500 text-blue-300 p-4 rounded">${forecastMessage}</p>`;
+            
+            // --- RENDER FUNCTIONS (Integrated Components) ---
+            const renderPoultryCards = () => {
+                document.getElementById('poultry-cards-container').innerHTML = Object.entries(flockManagementData.poultryInfo).map(([name, data]) => `
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-md transition-transform duration-300 card-hover">
+                        <h3 class="text-xl font-bold text-green-400 mb-3 flex items-center"><span class="text-2xl mr-3">${data.icon}</span> ${name}</h3>
+                        <div class="mb-4"><h4 class="font-semibold text-gray-400">Housing:</h4><p class="text-gray-300">${data.housing}</p></div>
+                        <div class="mb-4"><h4 class="font-semibold text-gray-400">Feeding:</h4><p class="text-gray-300">${data.feeding}</p></div>
+                        <div><h4 class="font-semibold text-gray-400">Health Management:</h4><p class="text-gray-300">${data.health}</p></div>
+                    </div>`).join('');
+            };
+            const renderDiseaseGuide = () => {
+                document.getElementById('disease-guide-container').innerHTML = flockManagementData.diseaseGuide.map(d => `
+                    <div class="text-center cursor-pointer disease-card" data-disease-id="${d.id}">
+                       <img src="${d.img}" alt="${d.name}" class="rounded-lg shadow-md w-full h-24 object-cover transition-transform duration-300 transform hover:scale-105">
+                       <p class="mt-2 text-sm font-medium text-gray-200">${d.name}</p>
+                    </div>`).join('');
+            };
+            const renderRelatedProductsTable = () => {
+                document.getElementById('related-products-body').innerHTML = poultryMarketData.relatedProducts.map(item => `
+                    <tr class="border-b border-gray-700 hover:bg-gray-700">
+                        <td class="p-3 font-medium">${item.product}</td>
+                        <td class="p-3 font-semibold">${item.price}</td>
+                    </tr>`).join('');
+            };
+            const diseaseModal = { backdrop: document.getElementById('disease-modal-backdrop'), content: document.getElementById('disease-modal-content'), open: function(id) { const d = flockManagementData.diseaseGuide.find(item => item.id === id); if (!d) return; this.content.querySelector('#modal-title').textContent = d.name; this.content.querySelector('#modal-image').src = d.img; this.content.querySelector('#modal-symptoms').textContent = d.symptoms; this.content.querySelector('#modal-management').textContent = d.management; this.backdrop.style.display = 'block'; this.content.style.display = 'block'; }, close: function() { this.backdrop.style.display = 'none'; this.content.style.display = 'none'; } };
+            const marketCharts = {
+                localPrice: { chart: null, init: function() { this.chart = new Chart(document.getElementById('local-price-chart').getContext('2d'), { type: 'line', options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } }, x: { ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } } }, plugins: { legend: { labels: { color: '#a0aec0' } } } } }); }, update: function() { if (!this.chart) return; const data = poultryMarketData.priceData.locations[marketState.location]; document.querySelector('.location-name').textContent = data.name; this.chart.data = { labels: poultryMarketData.priceData.labels, datasets: [ { label: 'Broiler Price (NGN/bird)', data: data.broiler, borderColor: '#fb923c', tension: 0.4 }, { label: 'Egg Price (NGN/crate)', data: data.eggs, borderColor: '#60a5fa', tension: 0.4 } ] }; this.chart.update(); } },
+                globalFeed: { chart: null, init: function() { this.chart = new Chart(document.getElementById('global-feed-chart').getContext('2d'), { type: 'bar', data: { labels: poultryMarketData.globalFeed.labels, datasets: [ { label: poultryMarketData.globalFeed.soybean.name, data: poultryMarketData.globalFeed.soybean.data, backgroundColor: '#16a34a' }, { label: poultryMarketData.globalFeed.maize.name, data: poultryMarketData.globalFeed.maize.data, backgroundColor: '#facc15' } ] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false, ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } }, x: { ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } } }, plugins: { legend: { labels: { color: '#a0aec0' } } } } }); } },
+                initAll: function() { this.localPrice.init(); this.globalFeed.init(); }
+            };
+
+            // --- RENDER FUNCTIONS (Original FarmWise) ---
+            const renderCropCards = () => { const container = document.getElementById('crop-cards-container'); container.innerHTML = ''; for (const cropName in cropData) { const data = cropData[cropName]; const card = document.createElement('div'); card.className = "bg-gray-800 p-6 rounded-lg shadow-md transition-transform duration-300 card-hover"; card.innerHTML = `<h3 class="text-xl font-bold text-green-400 mb-3 flex items-center"><span class="text-2xl mr-3">${data.icon}</span> ${cropName}</h3><div class="mb-4"><h4 class="font-semibold text-gray-400">Planting:</h4><p class="text-gray-300">${data.planting}</p></div><div><h4 class="font-semibold text-gray-400">Irrigation:</h4><p class="text-gray-300">${data.irrigation}</p></div>`; container.appendChild(card); } };
+            const renderLocalPrices = () => { const tableBody = document.getElementById('prices-table-body'); tableBody.innerHTML = ''; marketPrices.forEach(item => { const row = document.createElement('tr'); row.className = "border-b border-gray-700 hover:bg-gray-700"; let trendColor = item.trend === 'Up' ? 'text-up' : (item.trend === 'Down' ? 'text-down' : 'text-gray-400'); let trendIcon = item.trend === 'Up' ? '▲' : (item.trend === 'Down' ? '▼' : '▬'); row.innerHTML = `<td class="p-3 font-medium text-gray-200">${item.name}</td><td class="p-3 text-gray-300">${item.price_per_100kg}</td><td class="p-3 ${trendColor} font-semibold">${trendIcon} ${item.trend}</td>`; tableBody.appendChild(row); }); };
+            const renderValueAddedPrices = () => { const tableBody = document.getElementById('value-added-table-body'); tableBody.innerHTML = ''; valueAddedPrices.forEach(item => { const row = document.createElement('tr'); row.className = "border-b border-gray-700 hover:bg-gray-700"; row.innerHTML = `<td class="p-3 font-medium text-gray-200">${item.product}</td><td class="p-3 text-gray-400">${item.source}</td><td class="p-3 font-semibold text-gray-200">${item.price}</td><td class="p-3 text-gray-400">${item.unit}</td>`; tableBody.appendChild(row); }); };
+            const renderGlobalPrices = () => { const tableBody = document.getElementById('global-prices-table-body'); tableBody.innerHTML = ''; globalMarketPrices.forEach(item => { const row = document.createElement('tr'); row.className = "border-b border-gray-700 hover:bg-gray-700"; row.innerHTML = `<td class="p-3 font-medium text-gray-200">${item.commodity}</td><td class="p-3 font-semibold text-gray-200">${item.price}</td><td class="p-3 text-sm text-gray-400">${item.unit}</td>`; tableBody.appendChild(row); }); };
+            const renderOrganizations = () => { const container = document.getElementById('orgs-container'); container.innerHTML = ''; exportOrgs.forEach(org => { const div = document.createElement('div'); div.className = "border-l-4 border-green-500 pl-4"; div.innerHTML = `<h4 class="font-bold text-gray-200">${org.name}</h4><p class="text-sm text-gray-400">${org.description}</p>`; container.appendChild(div); }); };
+            const renderShippingTable = () => { const tableBody = document.getElementById('shipping-table-body'); tableBody.innerHTML = ''; shippingData.forEach(item => { const row = document.createElement('tr'); row.className = "border-b border-gray-700 hover:bg-gray-700"; row.innerHTML = `<td class="p-3 font-medium text-gray-200">${item.port}</td><td class="p-3 text-gray-400">${item.region}</td><td class="p-3 font-semibold text-gray-200">${item.cost}</td><td class="p-3 text-gray-400">${item.time}</td>`; tableBody.appendChild(row); }); };
+            const renderLocalPricesChart = () => { const ctx = document.getElementById('localPricesChart').getContext('2d'); const labels = marketPrices.filter(item => item.avg_price > 0).map(item => item.name); const data = marketPrices.filter(item => item.avg_price > 0).map(item => item.avg_price); new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: 'Avg. Price per 100kg (₦)', data: data, borderColor: '#4ade80', backgroundColor: 'rgba(74, 222, 128, 0.2)', tension: 0.3, fill: true, }] }, options: { responsive: true, scales: { y: { beginAtZero: false, ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } }, x: { ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } } }, plugins: { legend: { labels: { color: '#a0aec0' } }, tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } label += `₦${context.parsed.y.toLocaleString()}`; return label; } } } } } }); };
+            const renderShippingCostsChart = () => { const ctx = document.getElementById('shippingCostsChart').getContext('2d'); const labels = shippingData.map(item => item.port); const data = shippingData.map(item => item.avg_cost); new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Estimated Cost (USD)', data: data, backgroundColor: [ '#60a5fa', '#818cf8', '#f87171', '#a78bfa', '#fbbf24' ], borderColor: [ '#3b82f6', '#6366f1', '#ef4444', '#8b5cf6', '#f59e0b' ], borderWidth: 1 }] }, options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } }, x: { ticks: { color: '#a0aec0' }, grid: { color: '#4a5568' } } }, plugins: { legend: { labels: { color: '#a0aec0' } } } } }); };
+
+            // --- EVENT LISTENERS ---
+            const setupEventListeners = () => {
+                // Weather Map (Original)
+                const searchBtn = document.getElementById('search-btn'); const searchInput = document.getElementById('location-search'); const mapFrame = document.getElementById('windy-map');
+                const updateMap = (location) => { const locations = { 'lagos': {lat: 6.5244, lon: 3.3792}, 'ibadan': {lat: 7.3776, lon: 3.9470}, 'abeokuta': {lat: 7.1577, lon: 3.3435}, 'akure': {lat: 7.2526, lon: 5.1931} }; const city = location.toLowerCase().trim(); if (locations[city]) { const {lat, lon} = locations[city]; mapFrame.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=450&zoom=8&level=surface&overlay=rain&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`; } else { alert("Sorry, only Lagos, Ibadan, Abeokuta, or Akure are supported..."); } };
+                searchBtn.addEventListener('click', () => updateMap(searchInput.value));
+                searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') updateMap(searchInput.value); });
+
+                // Tab Switching Logic (Integrated)
+                document.getElementById('tabs-container').addEventListener('click', (e) => {
+                    if (e.target.matches('.tab-button')) {
+                        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                        e.target.classList.add('active');
+                        document.querySelectorAll('#tab-content > div').forEach(div => div.classList.add('hidden'));
+                        document.getElementById(e.target.dataset.tab).classList.remove('hidden');
+                    }
+                });
+                
+                // Market Component Listeners (Integrated)
+                document.getElementById('location-select').addEventListener('change', (e) => { marketState.location = e.target.value; marketCharts.localPrice.update(); });
+                
+                // Flock Management Listeners (Integrated)
+                document.getElementById('disease-guide-container').addEventListener('click', e => { const card = e.target.closest('.disease-card'); if (card) diseaseModal.open(card.dataset.diseaseId); });
+                document.getElementById('modal-close-btn').addEventListener('click', () => diseaseModal.close());
+                diseaseModal.backdrop.addEventListener('click', () => diseaseModal.close());
+            };
+            
+            // --- INITIALIZATION CALLS ---
+            // Original FarmWise
+            renderCropCards();
+            renderLocalPrices();
+            renderValueAddedPrices();
+            renderGlobalPrices();
+            renderOrganizations();
+            renderShippingTable();
+            renderLocalPricesChart();
+            renderShippingCostsChart();
+
+            // Integrated Components
+            renderPoultryCards();
+            renderDiseaseGuide();
+            renderRelatedProductsTable();
+            marketCharts.initAll();
+            marketCharts.localPrice.update();
+            
+            // Activate all listeners
+            setupEventListeners();
+        });
+    </script>
+</body>
+</html>
